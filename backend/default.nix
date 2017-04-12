@@ -3,14 +3,16 @@
 , common ? import ../common }:
 let 
   ghc = reflex-platform.ghc;
+  doJailbreak = reflex-platform.lib.doJailbreak;
   modified-ghc = ghc.override {
     overrides = self: super: {
-      heist = pkgs.haskell.lib.doJailbreak super.heist;
-      xmlhtml = pkgs.haskell.lib.doJailbreak super.xmlhtml;
-      hspec-snap = pkgs.haskell.lib.doJailbreak super.hspec-snap;
+      heist = doJailbreak super.heist;
+      xmlhtml = doJailbreak super.xmlhtml;
+      hspec-snap = doJailbreak super.hspec-snap;
     };
   };
   drv = modified-ghc.callPackage ./backend.nix {
+    mkDerivation = ghc.mkDerivation;
     common = common { compiler = modified-ghc; };
   };
 in

@@ -4,6 +4,7 @@
 let 
   ghc = reflex-platform.ghc;
   drv = ghc.callPackage ./client.nix {
+    mkDerivation = ghc.mkDerivation;
     common = common { compiler = ghc; };
   };
 in

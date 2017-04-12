@@ -5,14 +5,15 @@ let
   doJailbreak = reflex-platform.lib.doJailbreak;
   cabal2nixResult = reflex-platform.cabal2nixResult;
   ghcjs = reflex-platform.ghcjs;
-  ghcjsPackages = reflex-platform.ghcjsPackages.override {
-    overrides = self: super: {
-      servant-reflex = doJailbreak (cabal2nixResult ../servant-reflex);
-      dependent-sum = super.dependent-sum_0_4;
-      dependent-sum-template = doJailbreak super.dependent-sum-template;
-    };
-  };
-  drv = ghcjsPackages.callPackage ./frontend.nix {
+#  ghcjs = reflex-platform.ghcjs.override {
+#    overrides = self: super: {
+#      servant-reflex = doJailbreak (cabal2nixResult ../servant-reflex);
+#      dependent-sum = super.dependent-sum_0_4;
+#      dependent-sum-template = doJailbreak super.dependent-sum-template;
+#    };
+#  };
+  drv = ghcjs.callPackage ./frontend.nix {
+    mkDerivation = ghcjs.mkDerivation;
     common = common { compiler = ghcjs; };
   };
 in
