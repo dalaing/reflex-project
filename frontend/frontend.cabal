@@ -24,5 +24,5 @@ executable frontend
                      , servant-reflex
                      , common
   hs-source-dirs:      src
-  ghc-options:         -Wall
+  ghc-options:         -Wall -threaded
   default-language:    Haskell2010
