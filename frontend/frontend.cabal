@@ -23,6 +23,9 @@ executable frontend
                      , reflex-dom
                      , servant
                      , servant-reflex
+                     , text
+                     , errors
+                     , containers
                      , common
   hs-source-dirs:      src
   ghc-options:         -Wall -threaded
