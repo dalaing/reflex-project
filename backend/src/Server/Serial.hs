@@ -12,8 +12,8 @@ Portability : non-portable
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeFamilies #-}
-module Server.Serial (
-    runServer
+module Main (
+    main
   ) where
 
 import Data.Proxy
@@ -259,8 +259,8 @@ app baseDir source = makeSnaplet "test" "test" Nothing $ do
     ]
   return ()
 
-runServer :: IO ()
-runServer = do
+main :: IO ()
+main = do
   baseDir : _ <- getArgs
   source <- atomically $ mkSource
   forkIO $ host source guest

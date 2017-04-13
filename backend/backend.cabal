@@ -15,8 +15,8 @@ build-type:          Simple
 extra-source-files:  ChangeLog.md
 cabal-version:       >=1.10
 
-library
-  exposed-modules:     Server.Parallel, Server.Serial
+executable serve-serial
+  main-is:             Server/Serial.hs
   build-depends:       base >=4.9 && <4.10
                      , mtl >=2.2 && <2.3
                      , primitive >=0.6 && <0.7
@@ -33,4 +33,26 @@ library
                      , servant-snap
                      , common
   hs-source-dirs:      src
+  ghc-options:         -Wall -threaded
+  default-language:    Haskell2010
+
+executable serve-parallel
+  main-is:             Server/Parallel.hs
+  build-depends:       base >=4.9 && <4.10
+                     , mtl >=2.2 && <2.3
+                     , primitive >=0.6 && <0.7
+                     , hashable >=1.2 && <1.3
+                     , stm >=2.4 && <2.5
+                     , ttrie
+                     , dependent-sum
+                     , ref-tf
+                     , reflex
+                     , snap
+                     , snap-core
+                     , snap-server
+                     , servant
+                     , servant-snap
+                     , common
+  hs-source-dirs:      src
+  ghc-options:         -Wall -threaded
   default-language:    Haskell2010
