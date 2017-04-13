@@ -64,8 +64,8 @@ itemWidget k dValue = do
 
 listItemWidget :: forall t m . MonadWidget t m 
                => Event t () 
-               -> m (Event t ())
-listItemWidget eGet = do
+               -> m ()
+listItemWidget eGet = mdo
   let
     doGet :<|> _ :<|> _ = 
       client
@@ -73,12 +73,10 @@ listItemWidget eGet = do
         (Proxy :: Proxy m)
         (Proxy :: Proxy ())
         (constDyn (BasePath "api"))
-  getResp <- doGet eGet
 
-  dGet <- 
-    holdDyn [] . 
-    fmapMaybe reqSuccess $ 
-    getResp
+  ePostBuild <- getPostBuild
+  getResp <- doGet $ lefmost [ePostBuild, eGet, eHasDeletes]
+  dGet <- holdDyn [] . fmapMaybe reqSuccess $ getResp
 
   let dGetMap = fmap (M.fromList . zip [0..] . fmap API.value) dGet
 
@@ -86,26 +84,19 @@ listItemWidget eGet = do
 
   let squash m = if M.null m then Nothing else Just ()
 
-  return .
-    switch .
-    current . 
-    fmap (fmapMaybe squash. mergeMap) $
-    dMap
+  let eHasDeletes = switch . current . fmap (fmapMaybe squash . mergeMap) $ dMap
+  
+  return ()
 
 runGUI :: forall t m. MonadWidget t m => m ()
 runGUI = do
-  ePostBuild <- getPostBuild
-
   ePostDone <- postWidget
 
   el "br" $ return ()
 
   el "div" $ do
     eDoGet <- button "Get"
-
-    rec
-      eDeletes <- listItemWidget $ leftmost [ePostBuild, eDoGet, ePostDone, eDeletes]
-    return ()
+    listItemWidget $ leftmost [eDoGet, ePostDone]
 
   return ()
 
