@@ -65,13 +65,13 @@ data Input t =
   Input {
     ieGet    :: Event t ()
   , iePost   :: Event t String
-  , ieDelete :: Event t String
+  , ieDelete :: Event t Int
   }
 
 data Output t =
   Output {
     oeGet    :: Event t (Snap [Payload])
-  , oePost   :: Event t (Snap [Payload])
+  , oePost   :: Event t (Snap NoContent)
   , oeDelete :: Event t (Snap NoContent)
   }
 
@@ -98,9 +98,15 @@ type App t m = ( ReflexHost t
 guest :: App t m
 guest (Input eGet ePost eDelete) = do
 
+  let 
+    rem i xs
+      | i < 0 = xs
+      | i >= length xs = xs
+      | otherwise = let (ys, _ : zs) = splitAt (length xs - 1 - i) xs in ys ++ zs
+
   bList <- accum (flip ($)) [] . leftmost $ [
       (:) <$> ePost
-    , (\x -> filter (/= x)) <$> eDelete
+    , rem <$> eDelete
     ]
 
   performEvent_ $ (liftIO . putStrLn $ "FRP: get") <$ eGet
@@ -109,9 +115,9 @@ guest (Input eGet ePost eDelete) = do
 
   let
     eGetOut =
-      (return . fmap Payload) <$> bList <@ eGet
+      (return . fmap Payload . reverse) <$> bList <@ eGet
     ePostOut =
-      (\xs x -> return . fmap Payload $ x : xs) <$> bList <@> ePost
+      return NoContent <$ ePost
     eDeleteOut =
       return NoContent <$ eDelete
 
@@ -214,14 +220,14 @@ enqueueResponse (ReqRes req res) b = do
 data Source =
   Source {
     sGet :: ReqRes () (Snap [Payload])
-  , sPost :: ReqRes String (Snap [Payload])
-  , sDelete :: ReqRes String (Snap NoContent)
+  , sPost :: ReqRes String (Snap NoContent)
+  , sDelete :: ReqRes Int (Snap NoContent)
   }
 
 data In =
     IGet ()
   | IPost String
-  | IDelete String
+  | IDelete Int
 
 readIn :: Source -> STM In
 readIn (Source g p d) =
@@ -246,9 +252,9 @@ apiServer source = handleGet :<|> handlePost :<|> handleDelete
       res <- liftIO $ reqRes (sPost source) s
       liftSnap res
 
-    handleDelete s = do
-      liftIO . putStrLn $ "delete " ++ s
-      res <- liftIO $ reqRes (sDelete source) s
+    handleDelete i = do
+      liftIO . putStrLn $ "delete " ++ show i
+      res <- liftIO $ reqRes (sDelete source) i
       liftSnap res
 
 app :: String -> Source -> SnapletInit () ()

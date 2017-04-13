@@ -26,14 +26,6 @@ instance ToJSON Payload
 
 type MyAPI =
        "payloads" :> Get '[JSON] [Payload]
-  :<|> "payloads" :> ReqBody '[JSON] Payload :> Post '[JSON] [Payload]
-  :<|> "payloads" :> Capture "payload" String :> DeleteNoContent '[JSON] NoContent
+  :<|> "payloads" :> ReqBody '[JSON] Payload :> PostNoContent '[JSON] NoContent
+  :<|> "payloads" :> Capture "index" Int :> DeleteNoContent '[JSON] NoContent
 
--- we post a string
--- - the server will wait one minute and then return the list of strings as they are at that point in time
--- we delete a string
--- we get, it gives us the current list of strings
-
--- this implies we have Behavior (Set String) being passed to each of event handlers
-
--- we possibly pass around an stm map which the handlers can wait on

@@ -28,8 +28,8 @@ api :: Proxy MyAPI
 api = Proxy
 
 getPayload :: Manager -> BaseUrl -> ClientM [Payload]
-postPayload :: Payload -> Manager -> BaseUrl -> ClientM [Payload]
-deletePayload :: String -> Manager -> BaseUrl -> ClientM NoContent
+postPayload :: Payload -> Manager -> BaseUrl -> ClientM NoContent
+deletePayload :: Int -> Manager -> BaseUrl -> ClientM NoContent
 
 getPayload :<|> postPayload :<|> deletePayload = client api
 
@@ -49,26 +49,25 @@ runGet' url = do
       return []
     Right x -> return $ fmap value x
 
-runPost :: String -> IO [String]
+runPost :: String -> IO ()
 runPost s = runPost' s defaultBaseUrl
 
-runPost' :: String -> BaseUrl -> IO [String]
+runPost' :: String -> BaseUrl -> IO ()
 runPost' s url = do
   manager <- newManager defaultManagerSettings
   res <- runExceptT $ postPayload (Payload s) manager url
   case res of
     Left err -> do
       putStrLn $ "Error: " ++ show err
-      return []
-    Right x -> return $ fmap value x
+    Right _ -> return ()
 
-runDelete :: String -> IO ()
-runDelete s = runDelete' s defaultBaseUrl
+runDelete :: Int -> IO ()
+runDelete i = runDelete' i defaultBaseUrl
 
-runDelete' :: String -> BaseUrl -> IO ()
-runDelete' s url = do
+runDelete' :: Int -> BaseUrl -> IO ()
+runDelete' i url = do
   manager <- newManager defaultManagerSettings
-  res <- runExceptT $ deletePayload s manager url
+  res <- runExceptT $ deletePayload i manager url
   case res of
     Left err -> do
       putStrLn $ "Error: " ++ show err

@@ -65,13 +65,13 @@ data Input t =
   Input {
     ieGet    :: Event t (Ticket, ())
   , iePost   :: Event t (Ticket, String)
-  , ieDelete :: Event t (Ticket, String)
+  , ieDelete :: Event t (Ticket, Int)
   }
 
 data Output t =
   Output {
     oeGet    :: Event t (Ticket, Snap [Payload])
-  , oePost   :: Event t (Ticket, Snap [Payload])
+  , oePost   :: Event t (Ticket, Snap NoContent)
   , oeDelete :: Event t (Ticket, Snap NoContent)
   }
 
@@ -98,9 +98,15 @@ type App t m = ( ReflexHost t
 guest :: App t m
 guest (Input eGet ePost eDelete) = do
 
+  let 
+    rem i xs
+      | i < 0 = xs
+      | i >= length xs = xs
+      | otherwise = let (ys, _ : zs) = splitAt i xs in ys ++ zs
+
   bList <- accum (flip ($)) [] . leftmost $ [
       ((:) . snd) <$> ePost
-    , (\x -> filter (/= snd x)) <$> eDelete
+    , (\x -> rem (snd x)) <$> eDelete
     ]
 
   performEvent_ $ (liftIO . putStrLn $ "FRP: get") <$ eGet
@@ -111,11 +117,8 @@ guest (Input eGet ePost eDelete) = do
     fnGet = return . fmap Payload
     eGetOut = (\l (t, _) -> (t, fnGet l)) <$> bList <@> eGet
 
-    fnPost = return . fmap Payload
-    ePostOut = (\xs (t, x) -> (t, fnPost $ x : xs)) <$> bList <@> ePost
-
-    fnDel = return NoContent
-    eDeleteOut = (\(t, _) -> (t, fnDel)) <$> eDelete
+    ePostOut = (\(t, _) -> (t, return NoContent)) <$> ePost
+    eDeleteOut = (\(t, _) -> (t, return NoContent)) <$> eDelete
 
   return $
     Output
@@ -230,14 +233,14 @@ enqueueResponse (ReqRes _ _ res) t b =
 data Source =
   Source {
     sGet :: ReqRes () (Snap [Payload])
-  , sPost :: ReqRes String (Snap [Payload])
-  , sDelete :: ReqRes String (Snap NoContent)
+  , sPost :: ReqRes String (Snap NoContent)
+  , sDelete :: ReqRes Int (Snap NoContent)
   }
 
 data In =
     IGet (Ticket, ())
   | IPost (Ticket, String)
-  | IDelete (Ticket, String)
+  | IDelete (Ticket, Int)
 
 readIn :: Source -> STM In
 readIn (Source g p d) =
@@ -262,9 +265,9 @@ apiServer source = handleGet :<|> handlePost :<|> handleDelete
       res <- liftIO $ reqRes (sPost source) s
       liftSnap res
 
-    handleDelete s = do
-      liftIO . putStrLn $ "delete " ++ s
-      res <- liftIO $ reqRes (sDelete source) s
+    handleDelete i = do
+      liftIO . putStrLn $ "delete " ++ show i
+      res <- liftIO $ reqRes (sDelete source) i
       liftSnap res
 
 app :: String -> Source -> SnapletInit () ()
