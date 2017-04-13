@@ -17,6 +17,7 @@ module Server.Parallel (
   ) where
 
 import Data.Proxy
+import System.Environment
 
 import Control.Monad (void, forever)
 import Control.Monad.Fix (MonadFix)
@@ -37,6 +38,7 @@ import Servant.Server
 import Snap.Core
 import Snap.Snaplet
 import Snap.Http.Server
+import Snap.Util.FileServe
 
 import Reflex
 import Reflex.Host.Class
@@ -265,13 +267,17 @@ apiServer source = handleGet :<|> handlePost :<|> handleDelete
       res <- liftIO $ reqRes (sDelete source) s
       liftSnap res
 
-app :: Source -> SnapletInit () ()
-app source = makeSnaplet "test" "test" Nothing $ do
-  addRoutes [("api", serveSnap api $ apiServer source)]
+app :: String -> Source -> SnapletInit () ()
+app baseDir source = makeSnaplet "test" "test" Nothing $ do
+  addRoutes 
+    [ ("api", serveSnap api $ apiServer source)
+    , ("", serveDirectory baseDir)
+    ]
   return ()
 
 runServer :: IO ()
 runServer = do
+  baseDir : _ <- getArgs
   source <- atomically $ mkSource 10
   forkIO $ host source guest
-  serveSnaplet defaultConfig $ app source
+  serveSnaplet defaultConfig $ app baseDir source
