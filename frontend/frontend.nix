@@ -1,5 +1,5 @@
 { mkDerivation, base, common, ghcjs-dom, reflex, reflex-dom
-, servant-reflex, stdenv
+, servant, servant-reflex, stdenv
 }:
 mkDerivation {
   pname = "frontend";
@@ -8,7 +8,7 @@ mkDerivation {
   isLibrary = false;
   isExecutable = true;
   executableHaskellDepends = [
-    base common ghcjs-dom reflex reflex-dom servant-reflex
+    base common ghcjs-dom reflex reflex-dom servant servant-reflex
   ];
   license = stdenv.lib.licenses.bsd3;
 }

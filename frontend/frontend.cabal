@@ -21,6 +21,7 @@ executable frontend
                      , ghcjs-dom
                      , reflex
                      , reflex-dom
+                     , servant
                      , servant-reflex
                      , common
   hs-source-dirs:      src
