@@ -29,8 +29,9 @@ import Data.Hashable
 import Data.IORef (readIORef)
 import Data.Functor.Identity
 
-import Control.Concurrent (forkIO, threadDelay)
+import Control.Concurrent (forkIO, threadDelay, killThread)
 import Control.Concurrent.STM
+import Control.Exception (finally)
 import qualified Control.Concurrent.STM.Map as SM
 
 import Servant.API
@@ -269,5 +270,7 @@ main :: IO ()
 main = do
   baseDir : _ <- getArgs
   source <- atomically $ mkSource
-  forkIO $ host source guest
-  serveSnaplet defaultConfig $ app baseDir source
+  eventThreadId <- forkIO $ host source guest
+  finally (serveSnaplet defaultConfig $ app baseDir source) $ do
+    killThread eventThreadId
+ 
