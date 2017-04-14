@@ -18,7 +18,7 @@ cabal-version:       >=1.10
 library
   exposed-modules:     Servant.Server.Reflex
                      , Servant.Server.Reflex.Comms
-  other-modules:       Servant.Server.Reflex.Comms.Serial
+                     , Servant.Server.Reflex.Comms.Serial
                      , Servant.Server.Reflex.Comms.Parallel
   build-depends:       base >=4.9 && <4.10
                      , mtl >=2.2 && <2.3

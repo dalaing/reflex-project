@@ -16,6 +16,7 @@ Portability : non-portable
 {-# LANGUAGE UndecidableInstances #-}
 module Servant.Server.Reflex (
     ServantHost(..)
+  , Endpoint
   , App
   , host
   ) where
