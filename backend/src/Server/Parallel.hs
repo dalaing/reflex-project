@@ -9,7 +9,6 @@ Portability : non-portable
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeFamilies #-}
 module Main (
@@ -19,20 +18,11 @@ module Main (
 import Data.Proxy
 import System.Environment
 
-import Control.Monad (void, forever)
-import Control.Monad.Fix (MonadFix)
-import Control.Monad.Trans (MonadIO, liftIO)
-import Control.Monad.Primitive (PrimMonad)
-import Control.Monad.Ref
-import Data.Foldable (traverse_)
-import Data.Hashable
-import Data.IORef (readIORef)
-import Data.Functor.Identity
+import Control.Monad.Trans (liftIO)
 
-import Control.Concurrent (forkIO, threadDelay, killThread)
+import Control.Concurrent (forkIO, killThread)
 import Control.Concurrent.STM
 import Control.Exception (finally)
-import qualified Control.Concurrent.STM.Map as SM
 
 import Servant.API
 import Servant.Server
@@ -42,8 +32,6 @@ import Snap.Http.Server
 import Snap.Util.FileServe
 
 import Reflex
-import Reflex.Host.Class
-import Data.Dependent.Sum
 
 import Servant.Server.Reflex
 import Servant.Server.Reflex.Comms
@@ -88,15 +76,15 @@ guest e = do
   let
     eGet :<|> ePost :<|> eDelete = e
 
-  let 
-    rem i xs
+  let
+    remove i xs
       | i < 0 = xs
       | i >= length xs = xs
       | otherwise = let (ys, _ : zs) = splitAt i xs in ys ++ zs
 
   bList <- accum (flip ($)) [] . leftmost $ [
       ((:) . snd) <$> ePost
-    , (\x -> rem (snd x)) <$> eDelete
+    , (\x -> remove (snd x)) <$> eDelete
     ]
 
   performEvent_ $ (liftIO . putStrLn $ "FRP: get") <$ eGet
@@ -136,7 +124,7 @@ apiServer source = handleGet :<|> handlePost :<|> handleDelete
 
 app :: String -> Source 'Parallel MyGuest -> SnapletInit () ()
 app baseDir source = makeSnaplet "test" "test" Nothing $ do
-  addRoutes 
+  addRoutes
     [ ("api", serveSnap api $ apiServer source)
     , ("", serveDirectory baseDir)
     ]
@@ -147,5 +135,5 @@ main = do
   baseDir : _ <- getArgs
   source <- atomically $ mkSource (Proxy :: Proxy 'Parallel) myGuest
   eventThreadId <- forkIO $ host (Proxy :: Proxy 'Parallel) myGuest source guest
-  finally (serveSnaplet defaultConfig $ app baseDir source) $ do
+  finally (serveSnaplet defaultConfig $ app baseDir source) $
     killThread eventThreadId
