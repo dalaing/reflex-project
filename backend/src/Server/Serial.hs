@@ -49,18 +49,6 @@ type MyGuest = Endpoint () (Snap [Payload]) :<|>
 myGuest :: Proxy MyGuest
 myGuest = Proxy
 
--- We should do two versions of this:
--- - one like below, where multiple calls can bu happening and completing in arbitrary order
---   - should probably play with a version of this where each post effects the behavior immediately but returns the ticket after an arbitrary delay
---   - should use bounded queues for the inputs, to deal with back pressure
---
--- - another version, where the calls to each point are linearised, and so the ticket handling can be 
---   done with an input queue and an output queue, which can be taken care or entirely within the host
---   - do we even need tickets in this setting?
---   - should be able to handle random delays (and other calls happening at the same time)
---   - could use TMVar on the input to do that
---     - read from it, do the processing, take the TMVar after the response has been received
-
 infixl 4 <@>
 (<@>) :: Reflex t => Behavior t (a -> b) -> Event t a -> Event t b
 (<@>) b = push $ \x -> do
@@ -108,6 +96,7 @@ apiServer :: Source 'Serial MyGuest -> ServerT MyAPI (Handler () ())
 apiServer source = handleGet :<|> handlePost :<|> handleDelete
   where
     sGet :<|> sPost :<|> sDelete = source
+
     handleGet = do
       liftIO . putStrLn $ "get"
       res <- liftIO $ reqRes sGet ()
