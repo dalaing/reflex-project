@@ -8,4 +8,4 @@ let
     common = common { compiler = ghc; };
   };
 in
-if pkgs.lib.inNixShell then drv.env else drv
+drv

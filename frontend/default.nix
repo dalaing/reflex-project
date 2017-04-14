@@ -14,5 +14,5 @@ let
     common = common { compiler = ghcjs; };
   };
 in
-if pkgs.lib.inNixShell then drv.env else drv
+drv
 

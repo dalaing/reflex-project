@@ -14,5 +14,5 @@ let
     mkDerivation = ghc.mkDerivation;
   };
 in
-if pkgs.lib.inNixShell then drv.env else drv
+drv
 

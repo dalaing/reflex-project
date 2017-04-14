@@ -9,6 +9,7 @@ let
       heist = doJailbreak super.heist;
       xmlhtml = doJailbreak super.xmlhtml;
       hspec-snap = doJailbreak super.hspec-snap;
+      servant-server-reflex = self.callPackage ../servant-server-reflex/. {};
     };
   };
   drv = modified-ghc.callPackage ./backend.nix {
@@ -16,5 +17,5 @@ let
     common = common { compiler = modified-ghc; };
   };
 in
-if pkgs.lib.inNixShell then drv.env else drv
+drv
 
