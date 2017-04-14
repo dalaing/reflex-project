@@ -43,7 +43,7 @@ api :: Proxy MyAPI
 api = Proxy
 
 type MyGuest = Endpoint () (Snap [Payload]) :<|>
-               Endpoint String (Snap NoContent) :<|>
+               Endpoint Payload (Snap NoContent) :<|>
                Endpoint Int (Snap NoContent)
 
 myGuest :: Proxy MyGuest
@@ -83,8 +83,8 @@ guest e = do
       | otherwise = let (ys, _ : zs) = splitAt i xs in ys ++ zs
 
   bList <- accum (flip ($)) [] . leftmost $ [
-      ((:) . snd) <$> ePost
-    , (\x -> remove (snd x)) <$> eDelete
+      ((:) . value . snd) <$> ePost
+    , (remove . snd) <$> eDelete
     ]
 
   performEvent_ $ (liftIO . putStrLn $ "FRP: get") <$ eGet
@@ -112,9 +112,9 @@ apiServer source = handleGet :<|> handlePost :<|> handleDelete
       res <- liftIO $ reqRes sGet ()
       liftSnap res
 
-    handlePost (Payload s) = do
-      liftIO . putStrLn $ "post " ++ s
-      res <- liftIO $ reqRes sPost s
+    handlePost p = do
+      liftIO . putStrLn $ "post " ++ show p
+      res <- liftIO $ reqRes sPost p
       liftSnap res
 
     handleDelete i = do
