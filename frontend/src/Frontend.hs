@@ -75,7 +75,7 @@ listItemWidget eGet = mdo
         (constDyn (BasePath "api"))
 
   ePostBuild <- getPostBuild
-  getResp <- doGet $ lefmost [ePostBuild, eGet, eHasDeletes]
+  getResp <- doGet $ leftmost [ePostBuild, eGet, eHasDeletes]
   dGet <- holdDyn [] . fmapMaybe reqSuccess $ getResp
 
   let dGetMap = fmap (M.fromList . zip [0..] . fmap API.value) dGet
