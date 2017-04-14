@@ -45,10 +45,21 @@ import Reflex
 import Reflex.Host.Class
 import Data.Dependent.Sum
 
+import Servant.Server.Reflex
+import Servant.Server.Reflex.Comms
+import Servant.Server.Reflex.Comms.Parallel
+
 import API
 
 api :: Proxy MyAPI
 api = Proxy
+
+type MyGuest = Endpoint () (Snap [Payload]) :<|>
+               Endpoint String (Snap NoContent) :<|>
+               Endpoint Int (Snap NoContent)
+
+myGuest :: Proxy MyGuest
+myGuest = Proxy
 
 -- We should do two versions of this:
 -- - one like below, where multiple calls can be happening and completing in arbitrary order
@@ -62,20 +73,6 @@ api = Proxy
 --   - could use TMVar on the input to do that
 --     - read from it, do the processing, take the TMVar after the response has been received
 
-data Input t =
-  Input {
-    ieGet    :: Event t (Ticket, ())
-  , iePost   :: Event t (Ticket, String)
-  , ieDelete :: Event t (Ticket, Int)
-  }
-
-data Output t =
-  Output {
-    oeGet    :: Event t (Ticket, Snap [Payload])
-  , oePost   :: Event t (Ticket, Snap NoContent)
-  , oeDelete :: Event t (Ticket, Snap NoContent)
-  }
-
 infixl 4 <@>
 (<@>) :: Reflex t => Behavior t (a -> b) -> Event t a -> Event t b
 (<@>) b = push $ \x -> do
@@ -86,18 +83,10 @@ infixl 4 <@
 (<@) :: Reflex t => Behavior t b -> Event t a -> Event t b
 (<@) = tag
 
-type App t m = ( ReflexHost t
-               , PrimMonad (HostFrame t)
-               , MonadIO (HostFrame t)
-               , MonadHold t m
-               , MonadFix m
-               , Ref m ~ Ref IO
-               )
-             => Input t
-             -> PerformEventT t m (Output t)
-
-guest :: App t m
-guest (Input eGet ePost eDelete) = do
+guest :: App t m 'Parallel MyGuest
+guest e = do
+  let
+    eGet :<|> ePost :<|> eDelete = e
 
   let 
     rem i xs
@@ -115,163 +104,37 @@ guest (Input eGet ePost eDelete) = do
   performEvent_ $ (liftIO . putStrLn $ "FRP: delete") <$ eDelete
 
   let
-    fnGet = return . fmap Payload
+    fnGet = return . fmap Payload . reverse
     eGetOut = (\l (t, _) -> (t, fnGet l)) <$> bList <@> eGet
 
     ePostOut = (\(t, _) -> (t, return NoContent)) <$> ePost
     eDeleteOut = (\(t, _) -> (t, return NoContent)) <$> eDelete
 
   return $
-    Output
-      eGetOut
-      ePostOut
-      eDeleteOut
+    eGetOut :<|>
+    ePostOut :<|>
+    eDeleteOut
 
-host :: Source -> (forall t m. App t m) -> IO ()
-host source guest = runSpiderHost $ do
-  (eGetReq, eGetTriggerRef) <- newEventWithTriggerRef
-  (ePostReq, ePostTriggerRef) <- newEventWithTriggerRef
-  (eDeleteReq, eDeleteTriggerRef) <- newEventWithTriggerRef
-
-  (Output eGetRes ePostRes eDeleteRes, FireCommand fire) <- hostPerformEventT $ guest (Input eGetReq ePostReq eDeleteReq)
-
-  hGetRes <- subscribeEvent eGetRes
-  hPostRes <- subscribeEvent ePostRes
-  hDeleteRes <- subscribeEvent eDeleteRes
-
-  let
-    trigger :: Ref (SpiderHost Global) (Maybe (EventTrigger (SpiderTimeline Global) a))
-            -> a
-            -> (SpiderHost Global) ()
-    trigger t v = do
-      mTrigger <- liftIO . readIORef $ t
-      case mTrigger of
-        Just e -> fire [e :=> Identity v] readPhase >>= traverse_ handleOutput
-        Nothing -> return ()
-
-    readPhase = do
-      mGet <- readEvent hGetRes >>= sequence
-      mPost <- readEvent hPostRes >>= sequence
-      mDelete <- readEvent hDeleteRes >>= sequence
-      return (mGet, mPost, mDelete)
-
-    handleOutput (mGet, mPost, mDelete) = do
-      case mGet of
-        Nothing -> return ()
-        Just (t, g) -> liftIO . atomically $
-          enqueueResponse (sGet source) t g
-      case mPost of
-        Nothing -> return ()
-        Just (t, p) -> liftIO . atomically $
-          enqueueResponse (sPost source) t p
-      case mDelete of
-        Nothing -> return ()
-        Just (t, d) -> liftIO . atomically $
-          enqueueResponse (sDelete source) t d
-
-  forever $ do
-    -- this doesn't do fair reading from the sources
-    -- could probably do something about that
-    req <- liftIO . atomically $ readIn source
-
-    case req of
-      IGet g -> trigger eGetTriggerRef g
-      IPost p -> trigger ePostTriggerRef p
-      IDelete d -> trigger eDeleteTriggerRef d
-
-    return ()
-
-newtype Ticket = Ticket Int
-  deriving (Eq, Ord, Show, Hashable)
-
-data ReqRes a b =
-  ReqRes {
-    rrTicket :: TVar Ticket
-  , rrReq :: TBQueue (Ticket, a)
-  , rrRes :: SM.Map Ticket b
-  }
-
-mkReqRes :: Int -> STM (ReqRes a b)
-mkReqRes size =
-  ReqRes <$> newTVar (Ticket 0) <*> newTBQueue size <*> SM.empty
-
-getTicket :: TVar Ticket -> STM Ticket
-getTicket tv = do
-  Ticket t <- readTVar tv
-  writeTVar tv $ Ticket (succ t)
-  return $ Ticket t
-
-enqueueRequest :: ReqRes a b -> a -> STM Ticket
-enqueueRequest (ReqRes tv req _) a = do
-  t <- getTicket tv
-  writeTBQueue req (t, a)
-  return t
-
-waitForResponse :: ReqRes a b -> Ticket -> STM b
-waitForResponse (ReqRes _ _ res) t = do
-  v <- SM.lookup t res
-  case v of
-    Just x ->
-      return x
-    Nothing -> do
-      retry
-
--- for outside of the FRP network
-reqRes :: ReqRes a b -> a -> IO b
-reqRes rr a = do
-  t <- atomically $ enqueueRequest rr a
-  atomically $ waitForResponse rr t
-
--- for inside of the FRP network
-peekRequest :: ReqRes a b -> STM (Maybe (Ticket, a))
-peekRequest (ReqRes _ req _) =
-  tryReadTBQueue req
-
-enqueueResponse :: ReqRes a b -> Ticket -> b -> STM ()
-enqueueResponse (ReqRes _ _ res) t b =
-  SM.insert t b res
-
-data Source =
-  Source {
-    sGet :: ReqRes () (Snap [Payload])
-  , sPost :: ReqRes String (Snap NoContent)
-  , sDelete :: ReqRes Int (Snap NoContent)
-  }
-
-data In =
-    IGet (Ticket, ())
-  | IPost (Ticket, String)
-  | IDelete (Ticket, Int)
-
-readIn :: Source -> STM In
-readIn (Source g p d) =
-  (IGet <$> readTBQueue (rrReq g)) `orElse`
-  (IPost <$> readTBQueue (rrReq p)) `orElse`
-  (IDelete <$> readTBQueue (rrReq d))
-
-mkSource :: Int -> STM Source
-mkSource size =
-  Source <$> mkReqRes size <*> mkReqRes size <*> mkReqRes size
-
-apiServer :: Source -> ServerT MyAPI (Handler () ())
+apiServer :: Source 'Parallel MyGuest -> ServerT MyAPI (Handler () ())
 apiServer source = handleGet :<|> handlePost :<|> handleDelete
   where
+    sGet :<|> sPost :<|> sDelete = source
     handleGet = do
       liftIO . putStrLn $ "get"
-      res <- liftIO $ reqRes (sGet source) ()
+      res <- liftIO $ reqRes sGet ()
       liftSnap res
 
     handlePost (Payload s) = do
       liftIO . putStrLn $ "post " ++ s
-      res <- liftIO $ reqRes (sPost source) s
+      res <- liftIO $ reqRes sPost s
       liftSnap res
 
     handleDelete i = do
       liftIO . putStrLn $ "delete " ++ show i
-      res <- liftIO $ reqRes (sDelete source) i
+      res <- liftIO $ reqRes sDelete i
       liftSnap res
 
-app :: String -> Source -> SnapletInit () ()
+app :: String -> Source 'Parallel MyGuest -> SnapletInit () ()
 app baseDir source = makeSnaplet "test" "test" Nothing $ do
   addRoutes 
     [ ("api", serveSnap api $ apiServer source)
@@ -282,7 +145,7 @@ app baseDir source = makeSnaplet "test" "test" Nothing $ do
 main :: IO ()
 main = do
   baseDir : _ <- getArgs
-  source <- atomically $ mkSource 10
-  eventThreadId <- forkIO $ host source guest
+  source <- atomically $ mkSource (Proxy :: Proxy 'Parallel) myGuest
+  eventThreadId <- forkIO $ host (Proxy :: Proxy 'Parallel) myGuest source guest
   finally (serveSnaplet defaultConfig $ app baseDir source) $ do
     killThread eventThreadId

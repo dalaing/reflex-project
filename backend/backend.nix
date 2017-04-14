@@ -1,6 +1,6 @@
 { mkDerivation, base, common, dependent-sum, hashable, mtl
-, primitive, ref-tf, reflex, servant, servant-snap, snap, snap-core
-, snap-server, stdenv, stm, ttrie
+, primitive, ref-tf, reflex, servant, servant-server-reflex
+, servant-snap, snap, snap-core, snap-server, stdenv, stm, ttrie
 }:
 mkDerivation {
   pname = "backend";
@@ -10,7 +10,8 @@ mkDerivation {
   isExecutable = true;
   executableHaskellDepends = [
     base common dependent-sum hashable mtl primitive ref-tf reflex
-    servant servant-snap snap snap-core snap-server stm ttrie
+    servant servant-server-reflex servant-snap snap snap-core
+    snap-server stm ttrie
   ];
   license = stdenv.lib.licenses.bsd3;
 }
