@@ -14,8 +14,10 @@ Portability : non-portable
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE DeriveGeneric #-}
 module Servant.Server.Reflex (
     ServantHost(..)
+  , AsServantHost(..)
   , Endpoint
   , App
   , host
@@ -24,6 +26,7 @@ module Servant.Server.Reflex (
 import Control.Monad (forever)
 import Data.Functor.Identity (Identity(..))
 import Data.Proxy (Proxy(..))
+import GHC.TypeLits (KnownSymbol, KnownNat)
 
 import Control.Monad.STM (STM, atomically, orElse)
 import Control.Monad.Fix (MonadFix)
@@ -34,6 +37,8 @@ import Data.Foldable (traverse_)
 import Data.IORef (readIORef)
 
 import Servant.API
+import Servant.API.ContentTypes (AllCTRender(..), AllCTUnrender(..))
+import Snap.Core (Snap)
 
 import Reflex
 import Reflex.Host.Class
@@ -42,6 +47,7 @@ import Data.Dependent.Sum (DSum(..))
 import Servant.Server.Reflex.Comms
 import qualified Servant.Server.Reflex.Comms.Serial as S
 import qualified Servant.Server.Reflex.Comms.Parallel as P
+import Servant.Server.Reflex.Util
 
 data Endpoint i o
 
@@ -193,3 +199,152 @@ host c x s guest = runSpiderHost $ do
     act
 
   return ()
+
+class HasEndpoint api where
+  type EndpointInput api :: [*]
+  type EndpointOutput api :: [*]
+
+class AsServantHost api where
+  type ToServantHost api
+
+instance (AsServantHost a, AsServantHost b)
+    => AsServantHost (a :<|> b) where
+  type ToServantHost (a :<|> b) =
+    ToServantHost a :<|> ToServantHost b
+
+instance (KnownSymbol capture, FromHttpApiData a, HasEndpoint api)
+      => HasEndpoint (Capture capture a :> api) where
+  type EndpointInput (Capture capture a :> api) =
+    a ': EndpointInput api
+  type EndpointOutput (Capture capture a :> api) =
+    EndpointOutput api
+
+instance (KnownSymbol capture, FromHttpApiData a, HasEndpoint api)
+      => AsServantHost (Capture capture a :> api) where
+  type ToServantHost (Capture capture a :> api) =
+    Endpoint
+      (Collapsed (EndpointInput (Capture capture a :> api)))
+      (Snap (Collapsed (EndpointOutput (Capture capture a :> api))))
+
+instance (KnownSymbol capture, FromHttpApiData a, HasEndpoint api)
+      => HasEndpoint (CaptureAll capture a :> api) where
+  type EndpointInput (CaptureAll capture a :> api) =
+    [a] ': EndpointInput api
+  type EndpointOutput (CaptureAll capture a :> api) =
+    EndpointOutput api
+
+instance (KnownSymbol capture, FromHttpApiData a, HasEndpoint api)
+      => AsServantHost (CaptureAll capture a :> api) where
+  type ToServantHost (CaptureAll capture a :> api) =
+    Endpoint
+      (Collapsed (EndpointInput (CaptureAll capture a :> api)))
+      (Snap (Collapsed (EndpointOutput (CaptureAll capture a :> api))))
+
+instance (KnownSymbol sym, FromHttpApiData a, HasEndpoint api)
+      => HasEndpoint (Header sym a :> api) where
+  type EndpointInput (Header sym a :> api) =
+    Maybe a ': EndpointInput api
+  type EndpointOutput (Header sym a :> api) =
+    EndpointOutput api
+
+instance (KnownSymbol sym, FromHttpApiData a, HasEndpoint api)
+      => AsServantHost (Header sym a :> api) where
+  type ToServantHost (Header sym a :> api) =
+    Endpoint
+      (Collapsed (EndpointInput (Header sym a :> api)))
+      (Snap (Collapsed (EndpointOutput (Header sym a :> api))))
+
+instance (KnownSymbol sym, FromHttpApiData a, HasEndpoint api)
+      => HasEndpoint (QueryParam sym a :> api) where
+  type EndpointInput (QueryParam sym a :> api) =
+    Maybe a ': EndpointInput api
+  type EndpointOutput (QueryParam sym a :> api) =
+    EndpointOutput api
+
+instance (KnownSymbol sym, FromHttpApiData a, HasEndpoint api)
+      => AsServantHost (QueryParam sym a :> api) where
+  type ToServantHost (QueryParam sym a :> api) =
+    Endpoint
+      (Collapsed (EndpointInput (QueryParam sym a :> api)))
+      (Snap (Collapsed (EndpointOutput (QueryParam sym a :> api))))
+
+instance (KnownSymbol sym, FromHttpApiData a, HasEndpoint api)
+      => HasEndpoint (QueryParams sym a :> api) where
+  type EndpointInput (QueryParams sym a :> api) =
+    [a] ': EndpointInput api
+  type EndpointOutput (QueryParams sym a :> api) =
+    EndpointOutput api
+
+instance (KnownSymbol sym, FromHttpApiData a, HasEndpoint api)
+      => AsServantHost (QueryParams sym a :> api) where
+  type ToServantHost (QueryParams sym a :> api) =
+    Endpoint
+      (Collapsed (EndpointInput (QueryParams sym a :> api)))
+      (Snap (Collapsed (EndpointOutput (QueryParams sym a :> api))))
+
+instance (KnownSymbol sym, HasEndpoint api)
+      => HasEndpoint (QueryFlag sym :> api) where
+  type EndpointInput (QueryFlag sym :> api) =
+    Bool ': EndpointInput api
+  type EndpointOutput (QueryFlag sym :> api) =
+    EndpointOutput api
+
+instance (KnownSymbol sym, HasEndpoint api)
+      => AsServantHost (QueryFlag sym :> api) where
+  type ToServantHost (QueryFlag sym :> api) =
+    Endpoint
+      (Collapsed (EndpointInput (QueryFlag sym :> api)))
+      (Snap (Collapsed (EndpointOutput (QueryFlag sym :> api))))
+
+instance (AllCTUnrender list a, HasEndpoint api)
+      => HasEndpoint (ReqBody list a :> api) where
+  type EndpointInput (ReqBody list a :> api) =
+    a ': EndpointInput api
+  type EndpointOutput (ReqBody list a :> api) =
+    EndpointOutput api
+
+instance (AllCTUnrender list a, HasEndpoint api)
+      => AsServantHost (ReqBody list a :> api) where
+  type ToServantHost (ReqBody list a :> api) =
+    Endpoint
+      (Collapsed (EndpointInput (ReqBody list a :> api)))
+      (Snap (Collapsed (EndpointOutput (ReqBody list a :> api))))
+
+instance (KnownSymbol path, HasEndpoint api)
+      => HasEndpoint (path :> api) where
+  type EndpointInput (path :> api) =
+    EndpointInput api
+  type EndpointOutput (path :> api) =
+    EndpointOutput api
+
+instance (KnownSymbol path, HasEndpoint api)
+       => AsServantHost (path :> api) where
+  type ToServantHost (path :> api) =
+    Endpoint
+      (Collapsed (EndpointInput (path :> api)))
+      (Snap (Collapsed (EndpointOutput (path :> api))))
+
+instance (AllCTRender ctypes a, ReflectMethod method, KnownNat status)
+     => HasEndpoint (Verb (method :: k1) status ctypes a) where
+  type EndpointInput (Verb method status ctypes a) =
+    '[]
+  type EndpointOutput (Verb method status ctypes a) =
+    '[a]
+
+instance (AllCTRender ctypes a, ReflectMethod method, KnownNat status)
+     => AsServantHost (Verb (method :: k1) status ctypes a) where
+  type ToServantHost (Verb method status ctypes a) =
+    Endpoint
+      (Collapsed (EndpointInput (Verb method status ctypes a)))
+      (Snap (Collapsed (EndpointOutput (Verb method status ctypes a))))
+
+{-
+-- TODO unwind the headers hlist into the output list
+instance {-# OVERLAPPING #-} (AllCTRender ctypes a, ReflectMethod method, KnownNat status, GetHeaders (Headers h a))
+      => HasEndpoint (Verb method status ctypes (Headers h a)) where
+  type EndpointInput (Verb method status ctypes (Headers h a)) =
+    '[]
+  type EndpointOutput (Verb method status ctypes (Headers h a)) =
+    '[Headers h a]
+-}
+
