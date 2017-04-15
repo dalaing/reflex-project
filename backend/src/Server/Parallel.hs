@@ -26,7 +26,6 @@ import Control.Exception (finally)
 
 import Servant.API
 import Servant.Server
-import Snap.Core
 import Snap.Snaplet
 import Snap.Http.Server
 import Snap.Util.FileServe
@@ -35,7 +34,6 @@ import Reflex
 
 import Servant.Server.Reflex
 import Servant.Server.Reflex.Comms
-import Servant.Server.Reflex.Comms.Parallel
 
 import API
 
@@ -90,24 +88,7 @@ guest e = do
     eDeleteOut
 
 apiServer :: Source 'Parallel MyGuest -> ServerT MyAPI (Handler () ())
-apiServer source = handleGet :<|> handlePost :<|> handleDelete
-  where
-    sGet :<|> sPost :<|> sDelete = source
-
-    handleGet = do
-      liftIO . putStrLn $ "get"
-      res <- liftIO $ reqRes sGet ()
-      liftSnap res
-
-    handlePost p = do
-      liftIO . putStrLn $ "post " ++ show p
-      res <- liftIO $ reqRes sPost p
-      liftSnap res
-
-    handleDelete i = do
-      liftIO . putStrLn $ "delete " ++ show i
-      res <- liftIO $ reqRes sDelete i
-      liftSnap res
+apiServer = serve (Proxy :: Proxy 'Parallel) (Proxy :: Proxy MyAPI)
 
 app :: String -> Source 'Parallel MyGuest -> SnapletInit () ()
 app baseDir source = makeSnaplet "test" "test" Nothing $ do
