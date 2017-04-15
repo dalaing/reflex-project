@@ -6,3 +6,6 @@
 	path = servant-reflex
 	url = https://github.com/imalsogreg/servant-reflex
 	branch = jsaddle
+[submodule "servant-snap-reflex"]
+	path = servant-snap-reflex
+	url = https://github.com/dalaing/servant-snap-reflex

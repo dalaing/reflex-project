@@ -32,8 +32,8 @@ import Snap.Util.FileServe
 
 import Reflex
 
-import Servant.Server.Reflex
-import Servant.Server.Reflex.Comms
+import Servant.Snap.Reflex
+import Servant.Snap.Reflex.Comms
 
 import API
 

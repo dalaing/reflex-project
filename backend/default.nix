@@ -9,7 +9,7 @@ let
       heist = doJailbreak super.heist;
       xmlhtml = doJailbreak super.xmlhtml;
       hspec-snap = doJailbreak super.hspec-snap;
-      servant-server-reflex = self.callPackage ../servant-server-reflex/. {};
+      servant-snap-reflex = self.callPackage ../servant-snap-reflex/. {};
     };
   };
   drv = modified-ghc.callPackage ./backend.nix {
