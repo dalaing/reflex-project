@@ -12,6 +12,7 @@ Portability : non-portable
 {-# LANGUAGE FlexibleInstances #-}
 module Servant.Server.Reflex.Util (
     CollapseList(..)
+  , Gather(..)
   ) where
 
 data Gather (xs :: [*]) where
