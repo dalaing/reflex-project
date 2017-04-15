@@ -42,9 +42,7 @@ import API
 api :: Proxy MyAPI
 api = Proxy
 
-type MyGuest = Endpoint () (Snap [Payload]) :<|>
-               Endpoint Payload (Snap NoContent) :<|>
-               Endpoint Int (Snap NoContent)
+type MyGuest = ToServantHost MyAPI
 
 myGuest :: Proxy MyGuest
 myGuest = Proxy
